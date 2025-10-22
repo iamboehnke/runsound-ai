@@ -12,6 +12,9 @@ pnpm-debug.log*
 logs/
 *.log
 
+# data
+data/
+
 # Editor / OS
 .vscode/
 .idea/
