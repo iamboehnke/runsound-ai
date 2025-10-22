@@ -1,0 +1,28 @@
+# Node.js / build
+node_modules/
+dist/
+build/
+.next/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+.venv/
+venv/
+
+# Misc
+coverage/
+*.env
