@@ -1,4 +1,3 @@
-# src/fetch_strava.py
 """
 fetch_strava.py
 Utilities to authenticate with Strava, refresh access token, fetch latest run activity,
@@ -36,7 +35,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR", Path(__file__).resolve().parents[1] / "dat
 
 # Ensure data dir exists
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-CACHE_PATH = DATA_DIR / "latest_run.json"
+CACHE_PATH = DATA_DIR / "latest_runs.json"
 TOKEN_CACHE = DATA_DIR / "strava_token_cache.json"
 
 
@@ -99,35 +98,40 @@ def get_access_token() -> str:
     return access_token
 
 
-def get_latest_run(per_page: int = 20, access_token: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """
-    Fetch the most recent activity of type 'Run' from the athlete's activities.
-    Returns the raw activity JSON or None if no run found.
-    Caches the returned activity to data/latest_run.json
-    """
+def get_latest_runs(max_runs: int = 50, access_token: Optional[str] = None) -> list[Dict[str, Any]]:
+    """Fetch up to `max_runs` recent 'Run' activities with coordinates."""
     if access_token is None:
         access_token = get_access_token()
 
     headers = {"Authorization": f"Bearer {access_token}"}
     url = f"{STRAVA_API_BASE}/api/v3/athlete/activities"
-    params = {"per_page": per_page, "page": 1}
 
-    resp = requests.get(url, headers=headers, params=params, timeout=15)
-    if resp.status_code != 200:
-        raise RuntimeError(f"Failed to fetch activities: {resp.status_code} {resp.text}")
+    runs = []
+    page = 1
+    per_page = 30
 
-    activities = resp.json()
-    # find the first activity of type "Run"
-    for a in activities:
-        if a.get("type") == "Run":
-            # cache and return
-            try:
-                CACHE_PATH.write_text(json.dumps(a, indent=2))
-            except Exception:
-                pass
-            return a
+    while len(runs) < max_runs:
+        params = {"page": page, "per_page": per_page}
+        resp = requests.get(url, headers=headers, params=params, timeout=15)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Failed to fetch activities: {resp.status_code} {resp.text}")
 
-    return None
+        activities = resp.json()
+        if not activities:
+            break
+
+        page_runs = [a for a in activities if a.get("type") == "Run" and a.get("start_latlng")]
+        runs.extend(page_runs)
+
+        if len(runs) >= max_runs:
+            runs = runs[:max_runs]
+            break
+
+        page += 1
+
+    CACHE_PATH.write_text(json.dumps(runs, indent=2))
+    print(f"Fetched {len(runs)} runs — saved to {CACHE_PATH}")
+    return runs
 
 
 def get_activity_streams(activity_id: int, keys: str = "time,latlng,altitude,heartrate,velocity_smooth,cadence") -> Dict[str, Any]:
@@ -178,33 +182,39 @@ def avg_pace_min_per_km(activity_json: Dict[str, Any]) -> Optional[float]:
 
 
 if __name__ == "__main__":
-    # quick demo: fetch latest run, print some fields, and optionally fetch streams
     print("Running fetch_strava demo...")
     try:
-        run = get_latest_run()
-        if not run:
+        # get_latest_runs returns a list of runs
+        runs = get_latest_runs() # Renamed 'run' to 'runs' for clarity
+        
+        if not runs:
             print("No recent Run activity found in the last page of activities.")
         else:
+            latest_runs = runs[0] 
+            
             print("=== Latest Run Summary ===")
-            print(f"id: {run.get('id')}")
-            print(f"name: {run.get('name')}")
-            print(f"start_date_local: {run.get('start_date_local')}")
-            print(f"distance_m: {run.get('distance')}")
-            pace = avg_pace_min_per_km(run)
+            print(f"id: {latest_runs.get('id')}")
+            print(f"name: {latest_runs.get('name')}")
+            print(f"start_date_local: {latest_runs.get('start_date_local')}")
+            print(f"distance_m: {latest_runs.get('distance')}")
+            
+            # Use latest_run instead of run for the pace calculation
+            pace = avg_pace_min_per_km(latest_runs) 
+            
             if pace:
                 minutes = int(pace)
                 seconds = int(round((pace - minutes) * 60))
                 print(f"avg_pace: {minutes}:{seconds:02d} min/km")
             else:
                 print("avg_pace: unavailable")
-            print(f"average_heartrate: {run.get('average_heartrate')}")
-            print(f"average_cadence: {run.get('average_cadence')}")
-            print(f"map_summary_polyline: {'present' if run.get('map') and run['map'].get('summary_polyline') else 'none'}")
+            
+            print(f"average_heartrate: {latest_runs.get('average_heartrate')}")
+            print(f"average_cadence: {latest_runs.get('average_cadence')}")
+            print(f"map_summary_polyline: {'present' if latest_runs.get('map') and latest_runs['map'].get('summary_polyline') else 'none'}")
             print(f"Cached to: {CACHE_PATH}")
 
-            # optional: fetch streams (commented by default; can be large)
-            # streams = get_activity_streams(run['id'])
-            # print("Streams keys:", streams.keys())
+            streams = get_activity_streams(latest_runs['id']) 
+            print("Streams keys:", streams.keys())
 
     except Exception as e:
         print("Error:", e)
