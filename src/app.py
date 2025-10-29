@@ -1,7 +1,8 @@
 """
 app.py
 The CLI Orchestration script for RunSound AI.
-Runs the entire pipeline (fetch, engineer, recommend) and opens the result.
+Runs the entire pipeline (fetch, engineer, recommend) or the ML Recommender
+for a planned run.
 """
 
 import json
@@ -11,107 +12,103 @@ from pathlib import Path
 from typing import Dict, Any
 import subprocess
 
-# We now import the pipeline components directly to avoid 'subprocess' issues
-# If you get errors about modules not being found, you may need to adjust the path:
-# sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
+# NOTE: The ML Recommender is a self-contained script that asks the user for
+# run parameters, so we can replace the user prompt and the old recommender call.
 
-# Import pipeline functions
+# Import pipeline components - Keeping feature_engineer for historical run data,
+# but we will bypass its use for the *current* run's music prediction.
 from fetch_strava import get_latest_runs
 from fetch_weather import fetch_weather
 from feature_engineer import feature_engineer_runs, avg_pace_min_per_km
-from recommender import recommend_and_create_playlist # We will simplify this function next
+# --- START CHANGE 1: Update Import ---
+from ml_recommender import recommend_and_create_playlist_ml # Import the new ML function
+# --- END CHANGE 1 ---
 
 # --- Configuration ---
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 METADATA_PATH = DATA_DIR / "latest_playlist.json"
 
+
 # --- Orchestration Function ---
-def get_user_run_intent() -> str:
-    """Prompts the user for their desired run tempo or pace."""
-    print("\n--- NEW RUN SETUP ---")
-    
-    # We will ask for a high-level intent (Fast, Steady, Slow) for simplicity
-    # but you could easily extend this to accept a specific pace like '5:30'
-    while True:
-        intent = input("What kind of run are you planning? (Type 'Fast', 'Steady', or 'Slow'): ").strip().lower()
-        if intent in ['fast', 'steady', 'slow']:
-            return intent
-        print("Invalid input. Please type 'Fast', 'Steady', or 'Slow'.")
 
-def run_pipeline(run_intent: str) -> bool:
-    """Executes the entire RunSound AI data pipeline sequentially."""
-    
-    print("\n--- Starting RunSound AI Pipeline ---")
-    print(f"Goal: Generate playlist for a '{run_intent.capitalize()}' run.")
-    
-    # 1. Fetch Strava Data (Needed to get run history for the recommender/engineer scripts)
-    # 2. Fetch Weather Data (Still useful for history)
-    # 3. Engineer Features (Still useful for history, but music generation will be overridden)
-    # 4. Generate Playlist (NEW: Pass the run_intent)
+# NOTE: The old 'get_user_run_intent' is removed as the ML recommender prompts
+# the user for all necessary details (pace, distance, run type, etc.) itself.
 
+def run_historical_data_pipeline() -> bool:
+    """Executes the data fetching and engineering pipeline for historical data."""
+    
+    print("\n--- Starting RunSound AI Historical Data Pipeline ---")
+    
     scripts = [
         ("Fetching Strava Data...", "src/fetch_strava.py", []),
         ("Fetching Weather Data...", "src/fetch_weather.py", []),
         ("Engineering Features...", "src/feature_engineer.py", []),
-        # NEW: Pass the run intent as a command-line argument to recommender.py
-        ("Generating Spotify Playlist...", "src/alternative_recommender.py", [run_intent]),
     ]
 
     for message, script_path, args in scripts:
         print(f"| RUNNING: {message}")
         try:
             # Construct the command: [sys.executable, script_path, arg1, arg2, ...]
-            # Use the previous encoding fix here for reliability
             command = [sys.executable, "-X", "utf8", script_path] + args
             
             result = subprocess.run(
                 command, 
                 capture_output=True, 
                 text=True, 
-                encoding='utf-8', # Explicitly decode output
+                encoding='utf-8',
                 check=True
             )
-            print(f"| SUCCESS: {message} Output:\n{result.stdout.strip()}")
+            # Only print a concise success message from the script
+            print(f"| SUCCESS: {message}")
         except subprocess.CalledProcessError as e:
             print(f"\n| ERROR: Pipeline failed in {script_path}")
-            print(f"| STDOUT:\n{e.stdout}")
-            print(f"| STDERR:\n{e.stderr}")
-            input("\nPress Enter to exit.") # Pause to see the error
+            print(f"| STDERR:\n{e.stderr.strip()}")
             return False
         except FileNotFoundError:
             print(f"\n| ERROR: Could not find required script: {script_path}.")
-            input("\nPress Enter to exit.")
             return False
             
+    print("--- Historical Data Pipeline Complete ---")
     return True
+
 
 # --- Main Application Logic ---
 
 def main():
-    user_intent = get_user_run_intent()
-    if run_pipeline(user_intent):
-        if METADATA_PATH.exists():
-            try:
-                with open(METADATA_PATH, 'r') as f:
-                    metadata = json.load(f)
-                
-                url = metadata.get("playlist_url")
-                title = metadata.get("title", "RunSound AI Playlist")
-                
-                print("\n=============================================")
-                print("RunSound AI Playlist Generated Successfully!")
-                print(f"   Playlist Title: {title}")
-                print(f"   Playlist URL:   {url}")
-                print("=============================================")
-                
-                # --- The key replacement for the Streamlit UI ---
-                print("\nOpening playlist in your web browser...")
-                webbrowser.open(url)
-                
-            except Exception as e:
-                print(f"ERROR: Could not load final playlist metadata: {e}")
-        else:
-            print("\nERROR: Pipeline finished, but final metadata file was not created.")
+    # It is good practice to run the historical data pipeline first to ensure
+    # the necessary files (like ml_featured_runs.json) are up-to-date for the ML model.
+    run_historical_data_pipeline()
+
+    # --- START CHANGE 2 & 3: Replace old call with ML Recommender ---
+    # The ML recommender function is now the central entry point for playlist generation.
+    print("\n\n--- Starting ML-Powered Playlist Generation ---")
+    
+    # This function handles user input, model loading, prediction, track filtering,
+    # playlist creation, metadata saving, and browser opening internally.
+    recommend_and_create_playlist_ml()
+
+    # The rest of the main function is now redundant as the ml_recommender handles
+    # success/URL display, but we keep the final input for console stability.
+    
+    # We can reload the metadata saved by the ml_recommender just to confirm the end result.
+    if METADATA_PATH.exists():
+        try:
+            with open(METADATA_PATH, 'r') as f:
+                metadata = json.load(f)
+            
+            url = metadata.get("playlist_url", "URL not found")
+            title = metadata.get("title", "RunSound AI Playlist")
+            
+            print("\n=============================================")
+            print("FINAL STATUS: Playlist Ready (via ML Recommender)")
+            print(f"   Playlist Title: {title}")
+            print(f"   Playlist URL:   {url}")
+            print("=============================================")
+
+        except Exception as e:
+            print(f"ERROR: Could not load final playlist metadata: {e}")
+    else:
+        print("\nERROR: ML Recommender finished, but final metadata file was not created. Check ml_recommender.py output.")
 
     # Keep the console window open after completion for the user to see success/details
     input("\nRunSound AI pipeline finished. Press Enter to close.")
