@@ -4,25 +4,16 @@ The CLI Orchestration script for RunSound AI.
 Runs the entire pipeline (fetch, engineer, recommend) or the ML Recommender
 for a planned run.
 """
-
 import json
 import webbrowser
 import sys
 from pathlib import Path
 from typing import Dict, Any
 import subprocess
-
-# NOTE: The ML Recommender is a self-contained script that asks the user for
-# run parameters, so we can replace the user prompt and the old recommender call.
-
-# Import pipeline components - Keeping feature_engineer for historical run data,
-# but we will bypass its use for the *current* run's music prediction.
 from fetch_strava import get_latest_runs
 from fetch_weather import fetch_weather
 from feature_engineer import feature_engineer_runs, avg_pace_min_per_km
-# --- START CHANGE 1: Update Import ---
 from ml_recommender import recommend_and_create_playlist_ml # Import the new ML function
-# --- END CHANGE 1 ---
 
 # --- Configuration ---
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -30,10 +21,6 @@ METADATA_PATH = DATA_DIR / "latest_playlist.json"
 
 
 # --- Orchestration Function ---
-
-# NOTE: The old 'get_user_run_intent' is removed as the ML recommender prompts
-# the user for all necessary details (pace, distance, run type, etc.) itself.
-
 def run_historical_data_pipeline() -> bool:
     """Executes the data fetching and engineering pipeline for historical data."""
     
@@ -73,24 +60,10 @@ def run_historical_data_pipeline() -> bool:
 
 
 # --- Main Application Logic ---
-
 def main():
-    # It is good practice to run the historical data pipeline first to ensure
-    # the necessary files (like ml_featured_runs.json) are up-to-date for the ML model.
     run_historical_data_pipeline()
-
-    # --- START CHANGE 2 & 3: Replace old call with ML Recommender ---
-    # The ML recommender function is now the central entry point for playlist generation.
     print("\n\n--- Starting ML-Powered Playlist Generation ---")
-    
-    # This function handles user input, model loading, prediction, track filtering,
-    # playlist creation, metadata saving, and browser opening internally.
     recommend_and_create_playlist_ml()
-
-    # The rest of the main function is now redundant as the ml_recommender handles
-    # success/URL display, but we keep the final input for console stability.
-    
-    # We can reload the metadata saved by the ml_recommender just to confirm the end result.
     if METADATA_PATH.exists():
         try:
             with open(METADATA_PATH, 'r') as f:
@@ -109,8 +82,6 @@ def main():
             print(f"ERROR: Could not load final playlist metadata: {e}")
     else:
         print("\nERROR: ML Recommender finished, but final metadata file was not created. Check ml_recommender.py output.")
-
-    # Keep the console window open after completion for the user to see success/details
     input("\nRunSound AI pipeline finished. Press Enter to close.")
 
 
