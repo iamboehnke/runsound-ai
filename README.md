@@ -389,7 +389,6 @@ python-dotenv>=0.19.0
 
 **Optional:**
 ```
-Flask>=2.0.0  # For web interface (future)
 pytest>=6.2.0  # For testing
 ```
 
@@ -420,17 +419,17 @@ Progressive playlists for long runs use heuristics, not actual audio feature ana
 ## Future Development
 
 **Planned Features:**
-- Heart rate zone integration from Strava
-- Route elevation profile analysis
-- Playlist feedback loop (track skip behavior)
-- Time-of-day circadian optimization
 - Race countdown playlists
 - Social features (collaborative filtering)
+- Mobile app (React Native)
+- Dashboard with visualizations
 
 **Technical Improvements:**
 - Model versioning and A/B testing
 - Feature importance visualization
 - Automated hyperparameter tuning
+- Time-of-day circadian optimization
 - Cross-user model (cold start solution)
 
 ---
+
