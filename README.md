@@ -6,6 +6,13 @@ A system that analyzes your Strava training history and generates personalized S
 
 ---
 
+<img width="990" height="716" alt="Screenshot 2" src="https://github.com/user-attachments/assets/1bb082da-bb2d-4c6a-acd0-664627bdb00d" />
+<img width="990" height="762" alt="Screenshot 1" src="https://github.com/user-attachments/assets/85fb2ddd-28d3-43c1-8601-79243f2eb23f" />
+<img width="1260" height="932" alt="Screenshot 4" src="https://github.com/user-attachments/assets/b33e6326-80f1-491d-937e-2cdd405a3998" />
+<img width="966" height="623" alt="Screenshot 3" src="https://github.com/user-attachments/assets/2d798a41-f297-4655-ba63-f1f592fd41ef" />
+
+---
+
 ## Overview
 
 RunSound AI trains a Random Forest model on your historical running data to understand your patterns. When you plan a run, it predicts the ideal music profile and generates a 30-track Spotify playlist tailored to that specific workout.
@@ -432,4 +439,5 @@ Progressive playlists for long runs use heuristics, not actual audio feature ana
 - Cross-user model (cold start solution)
 
 ---
+
 
