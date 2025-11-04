@@ -193,56 +193,56 @@ def learn_genre_preferences() -> List[str]:
     """
     # TODO: Track which playlists user actually listens to
     # For now, use default preferences
-    return ["pop", "indie", "rap", "electronic", "rock"]
+    return ["pop", "indie", "rap", "electronic", "alternative", "hip-hop"]
 
 
-def get_search_queries_for_run(run_features: Dict[str, Any], preferred_genres: List[str]) -> List[str]:
-    """Generate intelligent search queries based on run characteristics and learned preferences."""
+def get_search_queries_for_run(run_features: Dict[str, Any], music_features: Dict[str, Any], preferred_genres: List[str]) -> List[str]:
+    """Generate intelligent search queries based on run characteristics, ML predictions, and learned preferences."""
     run_type = run_features.get("run_type", "steady")
     pace = run_features.get("avg_pace_min_km", 6.0)
     distance = run_features.get("distance_km", 5.0)
     temp = run_features.get("temp_c", 15.0)
     
+    target_tempo = music_features.get("target_tempo", 140)
+    
     genre_string = " OR ".join(preferred_genres[:3])
     
-    # Base queries by run type
     query_templates = {
         "interval": [
-            "high intensity workout",
-            "HIIT training music", 
-            "explosive energy running"
+            f"{target_tempo} BPM high energy",
+            "explosive pace music",      
+            "HIIT tempo track"         
         ],
         "tempo": [
-            "threshold running",
-            "sustained effort workout",
-            "driving beat running"
+            f"{target_tempo} BPM sustained effort",
+            "driving beat concentration",
+            "threshold pump-up"
         ],
         "easy": [
-            "easy running chill",
-            "recovery jog music",
-            "relaxed workout"
+            "recovery jog",
+            f"{target_tempo} BPM light upbeat",
+            "LO-FI chill running"
         ],
         "race": [
-            "race day motivation",
-            "peak performance running",
-            "championship energy"
+            f"peak performance {target_tempo} BPM",
+            "championship energy anthem",
+            "maximum effort upbeat"
         ],
         "long": [
-            "endurance running",
-            "marathon training music",
-            "steady pace long run"
+            f"endurance steady {target_tempo} BPM",
+            "long haul focus music",
+            "marathon progression"
         ],
         "steady": [
-            "running playlist",
-            "jogging music",
-            "workout motivation"
+            f"moderate pace {target_tempo} BPM",     
+            "upbeat mix for focus",
+            "consistent rhythm playlist"
         ],
     }
     
     base_queries = query_templates.get(run_type, query_templates["steady"])
     queries = [f"{q} ({genre_string})" for q in base_queries]
     
-    # Add context-based queries
     if pace < 5.0:
         queries.append(f"fast running high energy ({genre_string})")
     elif pace > 6.5:
@@ -256,8 +256,9 @@ def get_search_queries_for_run(run_features: Dict[str, Any], preferred_genres: L
     if distance > 15:
         queries.append(f"ultra distance endurance ({genre_string})")
     
+    queries.append(f"running {target_tempo} BPM ({genre_string})")
+    
     return queries
-
 
 def create_progressive_playlist(tracks: List[Dict], run_type: str, distance_km: float) -> List[Dict]:
     """
@@ -268,9 +269,6 @@ def create_progressive_playlist(tracks: List[Dict], run_type: str, distance_km: 
         # Just shuffle for other runs
         random.shuffle(tracks)
         return tracks[:30]
-    
-    # For long runs: progressive structure
-    # 20% warmup (lower energy) - 60% main (steady) - 20% finish strong
     
     n = min(len(tracks), 30)
     warmup_count = max(3, n // 5)
@@ -367,7 +365,7 @@ def generate_playlist_title(run_features: Dict[str, Any], music_features: Dict[s
     pace_str = format_pace(pace)
     tempo = music_features.get("target_tempo", 150)
     
-    return f"🏃 {run_type} | {pace_str}/km | {distance:.1f}km @ {tempo} BPM"
+    return f"{run_type} | {pace_str}/km | {distance:.1f}km @ {tempo} BPM"
 
 
 # --- Main Recommender ---
@@ -383,12 +381,12 @@ def recommend_and_create_playlist():
     """
     
     print("\n" + "="*70)
-    print("🎵 RUNSOUND AI - SMART ML RECOMMENDER 🏃")
+    print("RUNSOUND AI - SMART ML RECOMMENDER")
     print("="*70)
     
     # Step 1: Run Type Selection
     print("\n--- Plan Your Run ---")
-    print("\n🏃 Run Types:")
+    print("\nRun Types:")
     print("  • easy      - Easy recovery run (comfortable pace)")
     print("  • tempo     - Tempo run (comfortably hard, sustained)")
     print("  • interval  - Interval training (high intensity repeats)")
@@ -482,23 +480,22 @@ def recommend_and_create_playlist():
         # Step 7: Initialize Spotify
         sp = SpotifyClient()
         
-        # Step 8: Smart Track Search
-        print("\n--- 🔍 Searching for Tracks ---")
+        # Step 8: Smart Track Search (WORKAROUND: Audio Features endpoint er blokeret)
+        print("\n--- Searching for Tracks ---")
         preferred_genres = learn_genre_preferences()
         print(f"  Using genres: {', '.join(preferred_genres[:3])}")
         
-        queries = get_search_queries_for_run(run_features, preferred_genres)
+        queries = get_search_queries_for_run(run_features, music_features, preferred_genres)
         
         all_tracks = []
-        for query in queries[:5]:  # Limit queries
+        for query in queries[:5]:  
             tracks = search_tracks_by_query(sp, query, limit=50)
             all_tracks.extend(tracks)
         
-        # Remove duplicates
         unique_tracks = {t['id']: t for t in all_tracks if t.get('id')}
         all_tracks = list(unique_tracks.values())
         
-        print(f"  Found {len(all_tracks)} unique tracks")
+        print(f"  Found {len(all_tracks)} unique tracks based on ML-informed search queries.")
         
         if len(all_tracks) < 20:
             print("  Adding more variety...")
@@ -507,7 +504,6 @@ def recommend_and_create_playlist():
             unique_tracks = {t['id']: t for t in all_tracks if t.get('id')}
             all_tracks = list(unique_tracks.values())
         
-        # Step 9: Create Intelligent Playlist Structure
         selected_tracks = create_progressive_playlist(
             all_tracks, 
             run_features['run_type'],

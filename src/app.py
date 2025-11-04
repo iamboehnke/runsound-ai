@@ -13,7 +13,7 @@ import subprocess
 from fetch_strava import get_latest_runs
 from fetch_weather import fetch_weather
 from feature_engineer import feature_engineer_runs, avg_pace_min_per_km
-from ml_recommender import recommend_and_create_playlist_ml # Import the new ML function
+from ml_recommender import recommend_and_create_playlist
 
 # --- Configuration ---
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -63,7 +63,7 @@ def run_historical_data_pipeline() -> bool:
 def main():
     run_historical_data_pipeline()
     print("\n\n--- Starting ML-Powered Playlist Generation ---")
-    recommend_and_create_playlist_ml()
+    recommend_and_create_playlist()
     if METADATA_PATH.exists():
         try:
             with open(METADATA_PATH, 'r') as f:

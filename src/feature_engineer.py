@@ -12,10 +12,9 @@ from typing import Dict, Any, List
 import statistics
 
 # --- Configuration ---
-# NOTE: The OUT_PATH is updated to reflect the new, richer feature set
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 WEATHER_PATH = DATA_DIR / "run_weather.json"
-STRAVA_RUNS_PATH = DATA_DIR / "latest_runs.json" # Required for full Strava run data (e.g., elevation)
+STRAVA_RUNS_PATH = DATA_DIR / "latest_runs.json" 
 OUT_PATH = DATA_DIR / "ml_featured_runs.json"
 
 # --- Constants for Feature Mapping ---
